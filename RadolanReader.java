@@ -21,14 +21,8 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-package rain;
+package rain.radolan;
 
-import java.awt.BorderLayout;
-import java.awt.Color;
-import java.awt.Graphics;
-import java.awt.datatransfer.DataFlavor;
-import java.awt.datatransfer.Transferable;
-import java.awt.image.BufferedImage;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
@@ -38,18 +32,12 @@ import java.io.InputStreamReader;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.GregorianCalendar;
-import java.util.List;
 import java.util.TimeZone;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import java.util.zip.GZIPInputStream;
-import javax.swing.ImageIcon;
-import javax.swing.JFrame;
-import javax.swing.JLabel;
-import javax.swing.TransferHandler;
 
 /**
- *
+ * Decodes DWD Radolan Data.
+ * 
  * Spezifikation:
  * https://www.dwd.de/DE/leistungen/radolan/radolan_info/radolan_radvor_op_komposit_format_pdf.pdf?__blob=publicationFile&v=11
  *
@@ -65,7 +53,7 @@ public class RadolanReader {
      * @return
      * @throws IOException
      */
-    public RadolanData readFile(File gzipFile) throws IOException {
+    public static RadolanData readFile(File gzipFile) throws IOException {
         byte[] buffer = new byte[1024];
         //Create temporary file
         File decompressedFile;
@@ -109,13 +97,14 @@ public class RadolanReader {
 
     }
 
-    public RadolanData readRawData(File f) throws IOException {
+    public static RadolanData readRawData(File f) throws IOException {
 
         FileInputStream fis = new FileInputStream(f);
         InputStreamReader sr = new InputStreamReader(fis);
         BufferedReader br = new BufferedReader(sr);
 
         String line = br.readLine();
+//        System.out.println(line);
         //Read header
         String product = line.substring(0, 2);
         int day = Integer.parseInt(line.substring(2, 4));
@@ -181,9 +170,9 @@ public class RadolanReader {
             leadTime = Integer.parseInt(line.substring(markeVV + 2, markeMF).trim());
         }
 
-        System.out.println("Grid:" + x + "x " + y);
-        System.out.println("Leadtime:" + leadTime + "min");
-        System.out.println("Information: " + contentLength + " byte");
+//        System.out.println("Grid:" + x + "x " + y);
+//        System.out.println("Leadtime:" + leadTime + "min");
+//        System.out.println("Information: " + contentLength + " byte");
 
         br.close();
         sr.close();
@@ -283,105 +272,5 @@ public class RadolanReader {
         return str.toString();
     }
 
-    public static void main(String[] args) {
-
-        // File to load (bin/.gz/raw data)
-        File file = new File("C:\\Users\\saemann\\Desktop\\RQ1907221600_000.gz");
-
-        final JFrame frame = new JFrame(file.getAbsolutePath() + "    Robert Sämann 2019");
-        try {
-            //Decode data
-            final RadolanReader rr = new RadolanReader();
-            RadolanData data = rr.readFile(file);
-
-            //Prepare frame size
-            frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-            frame.setBounds(100, 100, data.x + 200, data.y + 50);
-            frame.setVisible(true);
-            final JLabel label = new JLabel("Placeholder for Picture");
-
-            label.setToolTipText("Drag & Drop file here to show content.");
-            frame.setLayout(new BorderLayout());
-            frame.add(label, BorderLayout.CENTER);
-
-            //Mark some cities in the picture
-            BufferedImage bi = data.createImage();
-            Graphics g = bi.getGraphics();
-            g.setColor(Color.magenta);
-
-            double[] dataXY = data.getPositionIndicesForLatLon(52.517892, 13.385468); //Berlin
-            g.fillOval((int) (dataXY[0] - 2), (int) (dataXY[1] - 2), 6, 6);
-
-            dataXY = data.getPositionIndicesForLatLon(52.380629, 9.727707); //Hannover
-            g.drawOval((int) (dataXY[0] - 3), (int) (dataXY[1] - 3), 6, 6);
-            //crosshair to show city without overriding the conent around
-            g.drawLine(0, (int) (dataXY[1]), (int) (dataXY[0]-20), (int) (dataXY[1]));
-             g.drawLine((int) (dataXY[0]+20), (int) (dataXY[1]), data.x, (int) (dataXY[1]));
-            g.drawLine((int) (dataXY[0]), 0, (int) (dataXY[0]), (int) (dataXY[1]-20));
-            g.drawLine((int) (dataXY[0]), (int) (dataXY[1]+20), (int) (dataXY[0]), data.y);
-            
-
-            // display picture on the frame
-            label.setIcon(new ImageIcon(bi));
-            //Display information nect to the picture
-            label.setText(data.toHTMLString());
-
-            label.setTransferHandler(new TransferHandler(null) {
-                @Override
-                public boolean canImport(TransferHandler.TransferSupport info) {
-                    // we only import FileList
-                    if (!info.isDataFlavorSupported(DataFlavor.javaFileListFlavor)) {
-                        return false;
-                    }
-                    return true;
-                }
-
-                @Override
-                public boolean importData(TransferHandler.TransferSupport info) {
-                    if (!info.isDrop()) {
-                        return false;
-                    }
-
-                    // Check for FileList flavor
-                    if (!info.isDataFlavorSupported(DataFlavor.javaFileListFlavor)) {
-                        displayDropLocation("List doesn't accept a drop of this type.");
-                        return false;
-                    }
-                    label.setIcon(null);
-                    // Get the fileList that is being dropped.
-                    Transferable t = info.getTransferable();
-                    List<File> data;
-                    try {
-                        data = (List<File>) t.getTransferData(DataFlavor.javaFileListFlavor);
-                        RadolanData d = rr.readFile(data.get(0));
-                        BufferedImage bi = d.createImage();
-                        Graphics g = bi.getGraphics();
-                        g.setColor(Color.magenta);
-                        g.fillOval(530, 900 - 603, 3, 3);
-                        ImageIcon ii = new ImageIcon(bi);
-                        label.setIcon(ii);
-
-                        label.setText(d.toHTMLString());
-
-                        frame.setTitle(data.get(0).getAbsolutePath());
-                    } catch (Exception e) {
-                        label.setIcon(null);
-                        label.setText(e.getLocalizedMessage());
-                        e.printStackTrace();
-                        return false;
-                    }
-
-                    return true;
-                }
-
-                private void displayDropLocation(String string) {
-                    System.out.println(string);
-                }
-            });
-
-        } catch (Exception ex) {
-            Logger.getLogger(RadolanReader.class.getName()).log(Level.SEVERE, null, ex);
-            frame.setTitle(ex.getLocalizedMessage());
-        }
-    }
+  
 }

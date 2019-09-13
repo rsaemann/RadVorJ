@@ -21,42 +21,46 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-package rain;
+package rain.radolan;
 
-import java.awt.image.BufferedImage;
-import java.awt.image.WritableRaster;
 import java.util.GregorianCalendar;
 
 /**
+ * Information and data of one File from DWD. Radolan, Radvor data storage.
  *
  * @author saemann
  */
 public class RadolanData {
 
-    public static String product;
+    public String product;
 
     /**
      * Values as integer stored in the file. beginning with lower-left corner.
      * first index i: rows (horizontal) 0=South ; secondindex j: column 0=West
      */
-    public static int[][] values;
+    public int[][] values;
     /**
      * number of horizontal elements
      */
-    public static int x;
+    public int x;
     /**
      * Number of vertical elements
      */
-    public static int y;
+    public int y;
     /**
      * Lead time in minutes
      */
-    public static int leadTime;
-    
+    public int leadTime;
+
+    /**
+     * Factor to multiplicate the data values.
+     */
+    public float factor = 0.1f;// RQ has factor E-1;
+
     /**
      * Time of creation (not time of forecast)
      */
-    public static GregorianCalendar productionTime;
+    public GregorianCalendar productionTime;
 
     private double lowerleftLat, lowerleftLon, upperleftLat, upperleftLon, lowerRightLat, lowerRightLon, upperRightLat, upperRightLon;
 
@@ -81,29 +85,24 @@ public class RadolanData {
         return "<html>" + product + "<br> " + productionTime.getTime().toGMTString() + "<br>(" + productionTime.getTime().toLocaleString() + " local)<br>" + x + " x " + y + "<br>" + leadTime + "min lead</html>";
     }
 
-    public BufferedImage createImage() {
-        if (this.values == null) {
-            throw new NullPointerException("No data values read.");
-        }
-        BufferedImage bi = new BufferedImage(this.values.length, this.values[0].length, BufferedImage.TYPE_INT_RGB);
-        WritableRaster raster = bi.getRaster();
-        for (int iy = 0; iy < values.length; iy++) {
-            int yt = y - 1 - iy;//inverse Y for top down orientation
-            for (int xt = 0; xt < values[0].length; xt++) {
-                int value = values[iy][xt];
-                if (value == Integer.MIN_VALUE) {
-                    raster.setPixel(xt, yt, new int[]{100, 80, 80});
-                } else if (value == 0) {
-                    raster.setPixel(xt, yt, new int[]{0, 0, 0});
+    public String createTextPicture(boolean reverseY) {
+        StringBuffer str = new StringBuffer(x * y * 3);
+        for (int i = 0; i < y; i++) {
+            int ii = i;
+            if (reverseY) {
+                ii = y - i - 1;
+            }
+            for (int j = 0; j < x; j++) {
+                int v = values[ii][j];
+                if (v == Integer.MIN_VALUE) {
+                    str.append(" ").append(",");
                 } else {
-                    raster.setPixel(xt, yt, new int[]{(int) Math.min(255, Math.max(0, value > 0 ? 100 : 0) + value * 10), value > 0 ? 200 : 0, 0/*(int) Math.min(255, Math.max(0, (value*10)) )*/});
+                    str.append(v).append(",");
                 }
             }
-//            System.out.println(yt);
+            str.append('\n');
         }
-        bi.setData(raster);
-
-        return bi;
+        return str.toString();
     }
 
     /**
@@ -152,27 +151,53 @@ public class RadolanData {
      */
     public double[] getPositionIndicesForLatLon(double lat, double lon) {
         if (x == 900 && y == 900) {
-            double diffLat = lat - 51;
-            double difflon = lon - 9;
-            System.out.println("diff: x=" + difflon + "  y:" + diffLat);
+            double diffLat = lat - 60;
+            double diffLon = lon - 10;
+            System.out.println("diff: x=" + diffLon + "  y:" + diffLat);
             double y;
             if (Math.abs(diffLat) < 0.000001) {
                 y = 450;
             } else {
-                y = 450 + 111 * diffLat; //~111km/1°N everywhere
+                y = 450 + 111.1782 * diffLat; //~111km/1°N everywhere
             }
             double x;
-            if (Math.abs(difflon) < 0.00000001) {
+            if (Math.abs(diffLon) < 0.00000001) {
                 x = 450;
             } else {
-                x = 450 + 68 * difflon;  //~68km/1°E in Germany
+                x = 450 + 111.1782 * Math.cos(lat * 0.0174532925) * diffLon;  //~68km/1°E in Germany
             }
+            
+            //
+            double m=(1+Math.sin(60/180.*Math.PI))/(1+Math.sin(lat/180.*Math.PI));
+            System.out.println("m("+lat+") = "+m);
+            x=6370.04*m*Math.cos(lat/180.*Math.PI)*Math.sin(diffLon/180.*Math.PI);
+            y=-6370.04*m*Math.cos(lat/180.*Math.PI)*Math.cos(diffLon/180.*Math.PI);
+            System.out.println("y=-6370.04*"+m+"*"+Math.cos(lat/180.*Math.PI)+" * "+Math.cos(diffLon/180.*Math.PI));
 
-            return new double[]{x, this.y - y};
+            return new double[]{x, y};
         }
         throw new UnsupportedOperationException("Not yet implemented");
 
 //        return new double[]{lat,lon};
+    }
+    
+    public static void main1(String[] args) {
+         double lowerleftLat, lowerleftLon, upperleftLat, upperleftLon, lowerRightLat, lowerRightLon, upperRightLat, upperRightLon;
+ 
+            lowerleftLat = 46.9526;
+            lowerleftLon = 3.5889;
+            upperleftLat = 54.5877;
+            upperleftLon = 2.0715;
+
+            lowerRightLat = 47.0705;
+            lowerRightLon = 14.6209;
+            upperRightLat = 54.7405;
+            upperRightLon = 15.7208;
+            
+            RadolanData data=new RadolanData(null, null, 900, 900, 1, null, lowerleftLat, lowerleftLon, upperleftLat, upperleftLon, lowerRightLat, lowerRightLon, upperRightLat, upperRightLon);
+            
+        double[] pos = data.getPositionIndicesForLatLon(46.9526,3.5889);
+            System.out.println(pos[0]+" , "+pos[1]);
     }
 
     /**
@@ -184,6 +209,14 @@ public class RadolanData {
     public double[] getDataIndicesForLatLon(double lat, double lon) {
         double[] xy = getPositionIndicesForLatLon(lat, lon);
         return new double[]{y - xy[1], xy[0]};
+    }
+
+    public int getValueIJ(int i, int j) {
+        return values[i][j];
+    }
+
+    public int getValueXY(int x, int y) {
+        return values[this.y - y - 1][x];
     }
 
 }
