@@ -151,10 +151,10 @@ public class RadolanPanel extends JPanel {
         Graphics g = image.getGraphics();
         g.setColor(Color.magenta);
 
-        double[] dataXY = data.getPositionIndicesForLatLon(52.517892, 13.385468); //Berlin
+        double[] dataXY = data.getPositionIndicesForLatLon_DWD(52.517892, 13.385468); //Berlin
         g.fillOval((int) (dataXY[0] - 2), (int) (dataXY[1] - 2), 6, 6);
 
-        dataXY = data.getPositionIndicesForLatLon(52.380629, 9.727707); //Hannover
+        dataXY = data.getPositionIndicesForLatLon_DWD(52.380629, 9.727707); //Hannover
         g.drawOval((int) (dataXY[0] - 3), (int) (dataXY[1] - 3), 6, 6);
         //crosshair to show city without overriding the conent around
         g.drawLine(0, (int) (dataXY[1]), (int) (dataXY[0] - 20), (int) (dataXY[1]));
@@ -162,6 +162,8 @@ public class RadolanPanel extends JPanel {
         g.drawLine((int) (dataXY[0]), 0, (int) (dataXY[0]), (int) (dataXY[1] - 20));
         g.drawLine((int) (dataXY[0]), (int) (dataXY[1] + 20), (int) (dataXY[0]), data.y);
 
+        System.out.println("rrertert "+dataXY[0]+", "+dataXY[1]);
+        
         if (mouseX >= 0 && mouseX < data.x) {
             if (mouseY >= 0 && mouseY < data.y) {
                 mouseValue = data.getValueXY(mouseX, mouseY);
@@ -207,7 +209,11 @@ public class RadolanPanel extends JPanel {
         }
 
         g2.setColor(Color.black);
-        g2.drawString("X:" + mouseX + ", Y:" + mouseY + ", i:" + (data.y - mouseY) + " j:" + mouseX + "    " + data.product + "  local:" + data.productionTime.getTime().toLocaleString() + "  " + ((data.leadTime > 0) ? ("+" + data.leadTime + " min") : "actual"), 3, data.y + 12);
+        if (data != null) {
+            g2.drawString("X:" + mouseX + ", Y:" + mouseY + ", i:" + (data.y - mouseY) + " j:" + mouseX + "    " + data.product + "  local:" + data.productionTime.getTime().toLocaleString() + "  " + ((data.leadTime > 0) ? ("+" + data.leadTime + " min") : "actual"), 3, data.y + 12);
+        }else{
+            g2.drawString("Drag & Drop *.gz file here to display map", 10, 30);
+        }
     }
 
     public BufferedImage createImage(RadolanData data) {
@@ -261,7 +267,7 @@ public class RadolanPanel extends JPanel {
     }
 
     public static void main(String[] args) {
-        File file = new File("C:\\Users\\saemann\\Desktop\\RQ1907221600_000.gz");
+        File file = new File("L:\\WetterDWDForecast\\RQ1910152230_000.gz");
         try {
             if (args != null && args.length > 0) {
                 for (String arg : args) {
@@ -283,13 +289,12 @@ public class RadolanPanel extends JPanel {
             frame.add(panel);
             if (file.exists()) {
                 panel.setData(RadolanReader.readFile(file));
+                double[] hannover = panel.data.getPositionIndicesForLatLon_DWD(52.39, 9.712296);
+                System.out.println("Hannover: X:" + hannover[0] + " ,  y:" + hannover[1]);
+
+                double[] ll = panel.data.getPositionIndicesForLatLon_DWD(46.9526, 3.5889);
+                System.out.println("lowerleft: X:" + ll[0] + " ,  y:" + ll[1]);
             }
-
-            double[] hannover = panel.data.getPositionIndicesForLatLon(52.39, 9.712296);
-            System.out.println("Hannover: X:" + hannover[0] + " ,  y:" + hannover[1]);
-
-            double[] ll = panel.data.getPositionIndicesForLatLon(46.9526, 3.5889);
-            System.out.println("lowerleft: X:" + ll[0] + " ,  y:" + ll[1]);
 
             //Prepare frame size
             frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
